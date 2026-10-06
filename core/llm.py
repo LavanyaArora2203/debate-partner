@@ -1,55 +1,76 @@
-# import os
-# from openai import OpenAI
+import os
+import time
+from groq import Groq
+from groq import RateLimitError, APIError
 
-# MODEL = os.getenv("LLM_MODEL", "gpt-6-luna")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
-# client = OpenAI(
-#     api_key=os.getenv("OPENAI_API_KEY")
-# )
+if not GROQ_API_KEY:
+    raise ValueError("GROQ_API_KEY is not set.")
+
+client = Groq(api_key=GROQ_API_KEY)
+
+PRIMARY_MODEL = os.getenv("LLM_MODEL", "openai/gpt-oss-20b")
+FALLBACK_MODEL = "openai/gpt-oss-120b"
 
 
-# def call_llm(
-#     system: str,
-#     user: str,
-#     max_tokens: int = 900,
-#     temperature: float = 0.8,
-#     json_mode: bool = False,
-# ) -> str:
+def call_llm(
+    system: str,
+    user: str,
+    max_tokens: int = 500,
+    temperature: float = 0.7,
+    json_mode: bool = False,
+    max_retries: int = 3
+) -> str:
 
-#     kwargs = {
-#         "model": MODEL,
-#         "instructions": system,
-#         "input": user,
-#         "max_output_tokens": max_tokens,
-#         "temperature": temperature,
-#     }
+    messages = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": user}
+    ]
 
-#     if json_mode:
-#         kwargs["text"] = {
-#             "format": {
-#                 "type": "json_object"
-#             }
-#         }
+    last_error = None
 
-#     response = client.responses.create(**kwargs)
+    for model in [PRIMARY_MODEL, FALLBACK_MODEL]:
 
-#     return response.output_text
-import os, requests
+        for attempt in range(max_retries):
 
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/chat")
-MODEL = os.getenv("LLM_MODEL", "llama3.2:3b")
+            try:
+                kwargs = {
+                    "model": model,
+                    "messages": messages,
+                    "temperature": temperature,
+                    "max_completion_tokens": max_tokens,
+                    "stream": False,
+                }
 
-def call_llm(system: str, user: str, max_tokens: int = 900,
-             temperature: float = 0.8, json_mode: bool = False) -> str:
-    payload = {
-        "model": MODEL,
-        "messages": [{"role": "system", "content": system},
-                     {"role": "user", "content": user}],
-        "stream": False,
-        "options": {"temperature": temperature, "num_predict": max_tokens, "num_ctx": 4096},
-    }
-    if json_mode:
-        payload["format"] = "json"
-    r = requests.post(OLLAMA_URL, json=payload, timeout=120)
-    r.raise_for_status()
-    return r.json()["message"]["content"]
+                if json_mode:
+                    kwargs["response_format"] = {
+                        "type": "json_object"
+                    }
+
+                response = client.chat.completions.create(**kwargs)
+
+                return response.choices[0].message.content
+
+            except RateLimitError as e:
+                last_error = e
+                wait_time = 2 ** attempt
+                print(
+                    f"Rate limit reached for {model}. "
+                    f"Retrying in {wait_time}s..."
+                )
+                time.sleep(wait_time)
+
+            except APIError as e:
+                last_error = e
+                print(f"Groq API error with {model}: {e}")
+                time.sleep(2 ** attempt)
+
+            except Exception as e:
+                last_error = e
+                print(f"Unexpected error with {model}: {e}")
+                break
+
+    raise RuntimeError(
+        f"All Groq models failed. Last error: {last_error}"
+    )

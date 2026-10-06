@@ -13,4 +13,5 @@ dependencies = [
     "python-multipart",
     "uvicorn[standard]",
     "pydantic",
+    "groq>=1.7.0",
 ]
