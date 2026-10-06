@@ -68,14 +68,7 @@ FEEDBACK RULES
 OUTPUT FORMAT
 Respond with ONLY a single valid JSON object. No markdown, no code fences, no text before or after. Use exactly this structure:
 
-{
-  "scores": {"content": 0, "style": 0, "strategy": 0},
-  "strengths": ["..."],
-  "weaknesses": ["..."],
-  "quotes": [{"from_student": "...", "comment": "..."}],
-  "next_drill": "...",
-  "overall_comment": "..."
-}
+{"scores": {"content": <integer 1-10>, "style": <integer 1-10>, "strategy": <integer 1-10>}, ...}
 """
 
 RETRY_MESSAGE = (
@@ -123,7 +116,7 @@ def judge_speech(motion: str, student_side: str, speech: str, rebuttal: str) -> 
 
     user_message = _build_user_message(motion, student_side, speech, rebuttal)
 
-    raw = call_llm(system=JUDGE_SYSTEM_PROMPT, user=user_message, max_tokens=1200, temperature=0.2)
+    raw = call_llm(system=JUDGE_SYSTEM_PROMPT, user=user_message, max_tokens=1200, temperature=0.2,json_mode=True)
 
     try:
         feedback = Feedback.model_validate_json(_extract_json(raw))
@@ -134,7 +127,7 @@ def judge_speech(motion: str, student_side: str, speech: str, rebuttal: str) -> 
             + "\n\n"
             + RETRY_MESSAGE.format(error=str(first_error)[:500])
         )
-        raw = call_llm(system=JUDGE_SYSTEM_PROMPT, user=retry_user, max_tokens=1200, temperature=0.0)
+        raw = call_llm(system=JUDGE_SYSTEM_PROMPT, user=retry_user, max_tokens=1200, temperature=0.0,json_mode=True)
         try:
             feedback = Feedback.model_validate_json(_extract_json(raw))
         except (ValueError, ValidationError, json.JSONDecodeError) as second_error:

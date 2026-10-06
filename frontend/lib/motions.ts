@@ -35,7 +35,7 @@ export const levelToApi: Record<string, DebateLevel> = {
   Advanced: 'advanced',
 }
 
-export const displayLevel: Record<DebateLevel, string> = {
+export const displayLevel: Record<DebateLevel, DisplayLevel> = {
   beginner: 'Beginner',
   intermediate: 'Intermediate',
   advanced: 'Advanced',

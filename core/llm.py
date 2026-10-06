@@ -1,8 +1,11 @@
-import requests
+import os
+from openai import OpenAI
 
+MODEL = os.getenv("LLM_MODEL", "gpt-6-luna")
 
-OLLAMA_URL = "http://localhost:11434/api/chat"
-MODEL = "llama3.2:3b"
+client = OpenAI(
+    api_key=os.getenv("OPENAI_API_KEY")
+)
 
 
 def call_llm(
@@ -10,29 +13,24 @@ def call_llm(
     user: str,
     max_tokens: int = 900,
     temperature: float = 0.8,
+    json_mode: bool = False,
 ) -> str:
-    response = requests.post(
-        OLLAMA_URL,
-        json={
-            "model": MODEL,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": system,
-                },
-                {
-                    "role": "user",
-                    "content": user,
-                },
-            ],
-            "stream": False,
-            "options": {
-                "temperature": temperature,
-                "num_predict": max_tokens,
-            },
-        },
-    )
 
-    response.raise_for_status()
+    kwargs = {
+        "model": MODEL,
+        "instructions": system,
+        "input": user,
+        "max_output_tokens": max_tokens,
+        "temperature": temperature,
+    }
 
-    return response.json()["message"]["content"]
+    if json_mode:
+        kwargs["text"] = {
+            "format": {
+                "type": "json_object"
+            }
+        }
+
+    response = client.responses.create(**kwargs)
+
+    return response.output_text

@@ -1,10 +1,14 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class Scores(BaseModel):
-    content: int = Field(ge=0, le=10)
-    style: int = Field(ge=0, le=10)
-    strategy: int = Field(ge=0, le=10)
+    content: int = Field(ge=1, le=10)
+    style: int = Field(ge=1, le=10)
+    strategy: int = Field(ge=1, le=10)
+    @field_validator("content", "style", "strategy", mode="before")
+    @classmethod
+    def _round(cls, v):
+        return round(v) if isinstance(v, float) else v
 
 
 class Quote(BaseModel):

@@ -31,7 +31,7 @@ MAX_WORDS = 600
 app = FastAPI(title="Debate Partner API", version="0.1.0")
 
 # Comma-separated list in .env, e.g. ALLOWED_ORIGINS=http://localhost:3000,https://your-app.vercel.app
-origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",") if o.strip()]
+origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -79,12 +79,12 @@ def debate(req: DebateRequest) -> DebateResponse:
         feedback = judge_speech(req.motion, req.student_side, req.speech, rebuttal)
     except ValueError as e:
         raise HTTPException(400, str(e))
-    except RuntimeError as e:
+    except RuntimeError:
         log.exception("Judge failed")
-        raise HTTPException(502, detail=str(e))
-    except Exception as e:
+        raise HTTPException(502, "The judge had trouble responding. Please try again.")
+    except Exception:
         log.exception("Unexpected error in /debate")
-        raise HTTPException(500, detail=str(e))
+        raise HTTPException(500, "Something went wrong. Please try again.")
 
     # Log metrics only, never the speech text (users may be minors)
     log.info("debate ok | level=%s | words=%d | %.1fs", req.level, words, time.perf_counter() - t0)
