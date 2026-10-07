@@ -1,5 +1,5 @@
 # core/opponent.py
-# Assumes: core/llm.py exposes call_llm(system: str, user: str, max_tokens: int = 1000, temperature: float = 0.7) -> str
+# Uses core.llm.call_llm, which returns non-empty text or raises LLMError.
 
 from core.llm import call_llm
 
@@ -18,6 +18,8 @@ LEVEL_GUIDE = {
         "with clear weighing."
     ),
 }
+
+MAX_WORDS_BY_LEVEL = {"beginner": 200, "intermediate": 300, "advanced": 400}
 
 OPPONENT_SYSTEM_PROMPT = """You are a competitive debater acting as the opposing speaker in a school-level debate practice session.
 
@@ -50,11 +52,10 @@ def _opposite_side(side: str) -> str:
 def build_opponent_prompts(motion: str, student_side: str, speech: str, level: str = "intermediate") -> tuple[str, str]:
     """Returns (system_prompt, user_message)."""
     level = level if level in LEVEL_GUIDE else "intermediate"
-    max_words = {"beginner": 200, "intermediate": 300, "advanced": 400}[level]
     opponent_side = _opposite_side(student_side)
 
     system = OPPONENT_SYSTEM_PROMPT.format(
-        max_words=max_words,
+        max_words=MAX_WORDS_BY_LEVEL[level],
         level=level,
         level_guide=LEVEL_GUIDE[level],
     )
@@ -75,4 +76,6 @@ def generate_rebuttal(motion: str, student_side: str, speech: str, level: str = 
         raise ValueError("Speech is empty.")
 
     system, user = build_opponent_prompts(motion, student_side, speech, level)
-    return call_llm(system=system, user=user, max_tokens=900, temperature=0.8).strip()
+    # 400 words is roughly 550 tokens. The rest of the budget is headroom for
+    # the model's reasoning tokens.
+    return call_llm(system=system, user=user, max_tokens=2000, temperature=0.8)
